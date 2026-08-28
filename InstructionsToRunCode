@@ -1,0 +1,90 @@
+Instructions to download and run the Incident Tracker Dashboard locally
+
+File name in repo: InstructionsToRunCode (this file)
+
+Overview
+
+This repository contains a static, client-side Incident Tracker Dashboard (index.html, app.js, styles.css) that parses an Excel (.xlsx) file you provide and renders charts and a data preview in your browser. There is no server-side code required — the page uses SheetJS (XLSX) and Chart.js from CDN.
+
+What you need
+
+- A modern web browser (Chrome, Edge, Firefox)
+- Python 3 (for a simple local HTTP server) OR Node.js (optional) — serving via HTTP is recommended so browser features and libraries load correctly.
+- Your Incident Tracker Excel file (the client data). Recommended filename: IncidentTracker.xlsx (not required, you can choose any name).
+
+Where to place the Excel file
+
+Option A — Upload from anywhere (recommended):
+- You can keep the Excel file anywhere on your computer and use the file chooser on the dashboard page to upload it. The web page reads the file you select — it does NOT have to be placed inside the project folder.
+
+Option B — Put the Excel file in the project folder (for convenience):
+- Copy your Excel file into the project folder (the same folder that contains index.html). This makes it easy to find, but you still must use the page's "Choose Excel file" button to load it (browser security prevents the page from automatically reading arbitrary local files without user selection).
+- Recommended filename when placing in project folder: IncidentTracker.xlsx
+
+How to download the repository
+
+1. Clone with Git:
+   git clone https://github.com/zainabafzal999-ops/intern-project.git
+   cd intern-project
+
+2. Or download the ZIP from GitHub and extract it.
+
+Serve the files locally (recommended)
+
+Browsers apply stricter rules to pages loaded via file:// so serve the folder over HTTP.
+
+Using Python 3 (simplest):
+
+1. Open a terminal in the project folder (where index.html is).
+2. Run:
+   python3 -m http.server 8000
+3. Open your browser to:
+   http://localhost:8000
+
+Using Node (http-server):
+
+1. Install http-server once (if not installed):
+   npm install -g http-server
+2. From the project folder run:
+   http-server -p 8000
+3. Open your browser to:
+   http://localhost:8000
+
+How to open and load your Excel (two ways)
+
+1) Recommended (anywhere on disk)
+   - Open http://localhost:8000 in your browser.
+   - Click the "Choose Excel file" input at the top of the page.
+   - Select your IncidentTracker.xlsx (or any .xlsx file with the expected columns).
+   - The dashboard will parse the first sheet and display the table and charts.
+
+2) If you placed the file in the project folder (optional)
+   - Place IncidentTracker.xlsx in the project folder.
+   - Open the dashboard at http://localhost:8000.
+   - Click the file chooser and select the file from the project folder.
+
+Expected Excel columns
+
+The code expects (case-insensitive) the following columns in the first sheet — presence of these fields improves charting quality:
+SR, Site, Sources, Shift, Year, Date, Incident Category, Criticality, Type of Incident, Event Title, GEHSMS Standard, Detailed Observation, What is the Action?, Priority, Owner, Status, New Timeline, Department, Area, Contractor Name, Responsible
+
+Notes & troubleshooting
+
+- Column header normalization: the dashboard normalizes header names (case and spacing) so "Incident Category" and "incidentcategory" are both accepted if they are parseable as one cell header.
+- Year parsing: if there is no Year column, the code will attempt to extract the year from the Date column (if dates are parseable).
+- Large files: very large spreadsheets are parsed in the browser and may be slow or memory-intensive.
+- If charts look cluttered (many contractors or sites), consider trimming data or request that I add Top-N grouping.
+- If the page appears blank or libraries fail to load, ensure you have internet access (the app uses CDN-hosted libraries). For offline use I can add local copies of the required JS files.
+
+Optional: Auto-load a file served from the same server (advanced)
+
+If you want the page to automatically fetch and load a file placed in the project folder (so you don't have to click the file input), I can add a small change to app.js to fetch a fixed filename (for example "IncidentTracker.xlsx") on page load. Note: browsers will block fetching local files unless served via HTTP (so you must still run the local server). Ask me to implement this and I will modify app.js.
+
+Contact / Next steps
+
+If you'd like, I can:
+- Add interactive filters, top-N grouping for long lists, or click-to-filter behavior.
+- Add an "auto-load" option to fetch a known filename from the server on page load.
+- Add local vendor files so the dashboard works offline without CDN.
+
+If you want any of those, tell me which one to implement next.
