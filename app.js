@@ -45,9 +45,6 @@ function handleData(rows) {
   const mappedRows = rows.map(r => keyMap(r));
 
   // create canonical column accessors
-  // columns expected (case-insensitive): SR, Site, Sources, Shift, Year, Date, Incident Category, Criticality, Type of Incident, Event Title, GEHSMS Standard, Detailed Observation, What is the Action?, Priority, Owner, Status, New Timeline, Department, Area, Contractor Name, Responsible
-
-  // For each row, extract important fields with fallbacks
   const data = mappedRows.map(r => ({
     sr: r['sr'] || r['s r'] || r['#'] || '',
     site: r['site'] || '',
@@ -96,17 +93,6 @@ function aggCount(rows, key) {
     counts[v] = (counts[v] || 0) + 1;
   });
   return counts;
-}
-
-function toSortedLabelsAndCounts(counts, topN) {
-  const entries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
-  if (topN) {
-    const other = entries.slice(topN).reduce((s, e) => s + e[1], 0);
-    const sliced = entries.slice(0, topN);
-    if (other > 0) sliced.push(['Other', other]);
-    return sliced.map(e => e[0]), sliced.map(e => e[1]);
-  }
-  return [entries.map(e => e[0]), entries.map(e => e[1])];
 }
 
 function renderSummary(rows) {
@@ -175,10 +161,37 @@ function renderCharts(rows) {
   const statusData = statusEntries.map(e=>e[1]);
   const ctxStatus = document.getElementById('chart-status').getContext('2d');
   charts.push(new Chart(ctxStatus, { type: 'doughnut', data: { labels: statusLabels, datasets:[{ data: statusData, backgroundColor: generateColors(statusData.length) }] }, options: { responsive: true, maintainAspectRatio: false } }));
+
+  // New: Trend by Shift (per Year)
+  // build list of years and shifts
+  const years = Array.from(new Set(rows.map(r=>r.year).filter(y=>y && y !== 'Unknown'))).sort();
+  const shifts = Array.from(new Set(rows.map(r=>r.shift).filter(s=>s && s !== 'Unknown'))).sort();
+  const shiftDatasets = shifts.map((sh, idx) => {
+    const dataPoints = years.map(y => rows.filter(r => r.year === y && r.shift === sh).length);
+    return { label: sh, data: dataPoints, borderColor: generateColors(1)[idx % generateColors(1).length], backgroundColor: 'transparent' };
+  });
+  const ctxShift = document.getElementById('chart-shift').getContext('2d');
+  charts.push(new Chart(ctxShift, { type: 'line', data: { labels: years, datasets: shiftDatasets }, options: { responsive: true, maintainAspectRatio: false } }));
+
+  // New: Incidents by Contractor
+  const contractorCounts = aggCount(rows, 'contractor_name');
+  const contractorEntries = Object.entries(contractorCounts).sort((a,b)=>b[1]-a[1]);
+  const contractorLabels = contractorEntries.map(e=>e[0]);
+  const contractorData = contractorEntries.map(e=>e[1]);
+  const ctxContractor = document.getElementById('chart-contractor').getContext('2d');
+  charts.push(new Chart(ctxContractor, { type: 'bar', data: { labels: contractorLabels, datasets:[{ label:'Incidents', data: contractorData, backgroundColor: '#6f42c1' }] }, options: { responsive: true, maintainAspectRatio: false } }));
+
+  // New: Priority Breakdown (pie)
+  const priorityCounts = aggCount(rows, 'priority');
+  const priorityEntries = Object.entries(priorityCounts).sort((a,b)=>b[1]-a[1]);
+  const priorityLabels = priorityEntries.map(e=>e[0]);
+  const priorityData = priorityEntries.map(e=>e[1]);
+  const ctxPriority = document.getElementById('chart-priority').getContext('2d');
+  charts.push(new Chart(ctxPriority, { type: 'pie', data: { labels: priorityLabels, datasets:[{ data: priorityData, backgroundColor: generateColors(priorityData.length) }] }, options: { responsive: true, maintainAspectRatio: false } }));
 }
 
 function generateColors(n) {
-  const palette = ['#3366CC','#DC3912','#FF9900','#109618','#990099','#0099C6','#DD4477','#66AA00','#B82E2E','#316395'];
+  const palette = ['#3366CC','#DC3912','#FF9900','#109618','#990099','#0099C6','#DD4477','#66AA00','#B82E2E','#316395','#6f42c1','#20c997','#fd7e14'];
   const out = [];
   for (let i=0;i<n;i++) out.push(palette[i % palette.length]);
   return out;
