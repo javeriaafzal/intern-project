@@ -9,71 +9,71 @@
   </head>
   <body>
     <div class="container py-4">
-      <header class="mb-4">
+      <header class="mb-4 text-center">
         <h1>Incident Tracker Dashboard</h1>
         <p class="lead">Upload your "Incident Tracker" Excel file to visualize incidents and overall safety metrics.</p>
       </header>
 
-      <div class="mb-3">
-        <input id="file-input" type="file" accept=".xlsx,.xls" class="form-control" />
+      <div class="mb-3 d-flex justify-content-center">
+        <input id="file-input" type="file" accept=".xlsx,.xls" class="form-control w-75" />
       </div>
 
-      <div id="summary" class="mb-4"></div>
+      <div id="summary" class="mb-4 text-center"></div>
 
-      <div class="row">
-        <div class="col-lg-6 mb-4">
-          <div class="card p-3">
-            <h5>Incidents by Site</h5>
-            <canvas id="chart-site" height="200"></canvas>
-          </div>
-        </div>
-        <div class="col-lg-6 mb-4">
-          <div class="card p-3">
-            <h5>Incidents by Year</h5>
-            <canvas id="chart-year" height="200"></canvas>
+      <div class="row gx-3 gy-4">
+        <div class="col-sm-6 col-lg-4">
+          <div class="card p-3 chart-card">
+            <h5 class="card-title">Incidents by Site</h5>
+            <canvas id="chart-site"></canvas>
           </div>
         </div>
 
-        <div class="col-lg-6 mb-4">
-          <div class="card p-3">
-            <h5>Incidents by Category</h5>
-            <canvas id="chart-category" height="200"></canvas>
+        <div class="col-sm-6 col-lg-4">
+          <div class="card p-3 chart-card">
+            <h5 class="card-title">Incidents by Year</h5>
+            <canvas id="chart-year"></canvas>
           </div>
         </div>
 
-        <div class="col-lg-6 mb-4">
-          <div class="card p-3">
-            <h5>Incidents by Criticality</h5>
-            <canvas id="chart-criticality" height="200"></canvas>
+        <div class="col-sm-6 col-lg-4">
+          <div class="card p-3 chart-card">
+            <h5 class="card-title">Incidents by Category</h5>
+            <canvas id="chart-category"></canvas>
           </div>
         </div>
 
-        <div class="col-lg-6 mb-4">
-          <div class="card p-3">
-            <h5>Incidents by Status</h5>
-            <canvas id="chart-status" height="200"></canvas>
+        <div class="col-sm-6 col-lg-4">
+          <div class="card p-3 chart-card">
+            <h5 class="card-title">Incidents by Criticality</h5>
+            <canvas id="chart-criticality"></canvas>
           </div>
         </div>
 
-        <!-- New charts -->
-        <div class="col-lg-6 mb-4">
-          <div class="card p-3">
-            <h5>Trend by Shift (per Year)</h5>
-            <canvas id="chart-shift" height="200"></canvas>
+        <div class="col-sm-6 col-lg-4">
+          <div class="card p-3 chart-card">
+            <h5 class="card-title">Incidents by Status</h5>
+            <canvas id="chart-status"></canvas>
           </div>
         </div>
 
-        <div class="col-lg-6 mb-4">
-          <div class="card p-3">
-            <h5>Incidents by Contractor</h5>
-            <canvas id="chart-contractor" height="200"></canvas>
+        <div class="col-sm-6 col-lg-4">
+          <div class="card p-3 chart-card">
+            <h5 class="card-title">Trend by Shift (per Year)</h5>
+            <canvas id="chart-shift"></canvas>
           </div>
         </div>
 
-        <div class="col-lg-6 mb-4">
-          <div class="card p-3">
-            <h5>Priority Breakdown</h5>
-            <canvas id="chart-priority" height="200"></canvas>
+        <div class="col-sm-6 col-lg-4">
+          <div class="card p-3 chart-card">
+            <h5 class="card-title">Incidents by Contractor</h5>
+            <canvas id="chart-contractor"></canvas>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-lg-4">
+          <div class="card p-3 chart-card">
+            <h5 class="card-title">Priority Breakdown</h5>
+            <canvas id="chart-priority"></canvas>
           </div>
         </div>
 
@@ -85,7 +85,7 @@
         <table id="data-table" class="table table-striped table-sm"></table>
       </div>
 
-      <footer class="mt-4 text-muted small">Built with SheetJS & Chart.js — static, client-side only.</footer>
+      <footer class="mt-4 text-muted small text-center">Built with SheetJS & Chart.js — static, client-side only.</footer>
     </div>
 
     <!-- Libraries -->

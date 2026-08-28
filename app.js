@@ -117,17 +117,51 @@ function destroyCharts() {
   charts = [];
 }
 
+// common chart options to improve UX: legend at bottom, tooltips that show counts + percentages
+function buildCommonOptions(extra = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
+      tooltip: {
+        callbacks: {
+          label: function(ctx) {
+            // show value and percentage when possible
+            const val = ctx.parsed;
+            // compute dataset total
+            let total = 0;
+            if (Array.isArray(ctx.dataset.data)) {
+              total = ctx.dataset.data.reduce((s, d) => s + (typeof d === 'number' ? d : (d && d.y) || 0), 0);
+            }
+            const percent = total ? ((typeof val === 'number' ? val : (val && val.y) || 0) / total * 100).toFixed(1) : null;
+            if (percent !== null) return `${ctx.label || ''}: ${val} (${percent}%)`;
+            return `${ctx.label || ''}: ${val}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { maxRotation: 45, minRotation: 0 }, grid: { display: false } },
+      y: { beginAtZero: true }
+    },
+    ...extra
+  };
+}
+
 function renderCharts(rows) {
   destroyCharts();
-  // Site chart
-  const siteCounts = aggCount(rows, 'site');
-  const [siteLabels, siteData] = Object.entries(siteCounts).sort((a,b)=>b[1]-a[1]).reduce((acc, e) => { acc[0].push(e[0]); acc[1].push(e[1]); return acc; }, [[],[]]);
 
+  // Site chart - horizontal bar for readability when many sites
+  const siteCounts = aggCount(rows, 'site');
+  const siteEntries = Object.entries(siteCounts).sort((a,b)=>b[1]-a[1]);
+  const siteLabels = siteEntries.map(e=>e[0]);
+  const siteData = siteEntries.map(e=>e[1]);
   const ctxSite = document.getElementById('chart-site').getContext('2d');
   charts.push(new Chart(ctxSite, {
     type: 'bar',
-    data: { labels: siteLabels, datasets: [{ label: 'Incidents', data: siteData, backgroundColor: '#007bff' }] },
-    options: { responsive: true, maintainAspectRatio: false }
+    data: { labels: siteLabels, datasets: [{ label: 'Incidents', data: siteData, backgroundColor: generateColors(siteData.length) }] },
+    options: buildCommonOptions({ indexAxis: 'y', scales: { x: { beginAtZero: true }, y: { ticks: { autoSkip: false } } } })
   }));
 
   // Year chart (line)
@@ -136,7 +170,7 @@ function renderCharts(rows) {
   const yearLabels = yearEntries.map(e=>e[0]);
   const yearData = yearEntries.map(e=>e[1]);
   const ctxYear = document.getElementById('chart-year').getContext('2d');
-  charts.push(new Chart(ctxYear, { type: 'line', data: { labels: yearLabels, datasets:[{ label: 'Incidents', data: yearData, borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.1)', fill: true }] }, options: { responsive: true, maintainAspectRatio: false } }));
+  charts.push(new Chart(ctxYear, { type: 'line', data: { labels: yearLabels, datasets:[{ label: 'Incidents', data: yearData, borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.12)', fill: true, tension: 0.3 }] }, options: buildCommonOptions({ scales: { x: { grid: { display: false } }, y: { beginAtZero:true } } }) }));
 
   // Category (pie)
   const catCounts = aggCount(rows, 'incident_category');
@@ -144,7 +178,7 @@ function renderCharts(rows) {
   const catLabels = catEntries.map(e=>e[0]);
   const catData = catEntries.map(e=>e[1]);
   const ctxCat = document.getElementById('chart-category').getContext('2d');
-  charts.push(new Chart(ctxCat, { type: 'pie', data: { labels: catLabels, datasets:[{ data: catData, backgroundColor: generateColors(catData.length) }] }, options: { responsive: true, maintainAspectRatio: false } }));
+  charts.push(new Chart(ctxCat, { type: 'pie', data: { labels: catLabels, datasets:[{ data: catData, backgroundColor: generateColors(catData.length) }] }, options: buildCommonOptions() }));
 
   // Criticality
   const critCounts = aggCount(rows, 'criticality');
@@ -152,7 +186,7 @@ function renderCharts(rows) {
   const critLabels = critEntries.map(e=>e[0]);
   const critData = critEntries.map(e=>e[1]);
   const ctxCrit = document.getElementById('chart-criticality').getContext('2d');
-  charts.push(new Chart(ctxCrit, { type: 'bar', data: { labels: critLabels, datasets:[{ label:'Incidents', data: critData, backgroundColor: '#dc3545' }] }, options: { responsive: true, maintainAspectRatio: false } }));
+  charts.push(new Chart(ctxCrit, { type: 'bar', data: { labels: critLabels, datasets:[{ label:'Incidents', data: critData, backgroundColor: generateColors(critData.length) }] }, options: buildCommonOptions() }));
 
   // Status
   const statusCounts = aggCount(rows, 'status');
@@ -160,26 +194,26 @@ function renderCharts(rows) {
   const statusLabels = statusEntries.map(e=>e[0]);
   const statusData = statusEntries.map(e=>e[1]);
   const ctxStatus = document.getElementById('chart-status').getContext('2d');
-  charts.push(new Chart(ctxStatus, { type: 'doughnut', data: { labels: statusLabels, datasets:[{ data: statusData, backgroundColor: generateColors(statusData.length) }] }, options: { responsive: true, maintainAspectRatio: false } }));
+  charts.push(new Chart(ctxStatus, { type: 'doughnut', data: { labels: statusLabels, datasets:[{ data: statusData, backgroundColor: generateColors(statusData.length) }] }, options: buildCommonOptions() }));
 
   // New: Trend by Shift (per Year)
-  // build list of years and shifts
   const years = Array.from(new Set(rows.map(r=>r.year).filter(y=>y && y !== 'Unknown'))).sort();
   const shifts = Array.from(new Set(rows.map(r=>r.shift).filter(s=>s && s !== 'Unknown'))).sort();
+  const colorForShifts = generateColors(shifts.length);
   const shiftDatasets = shifts.map((sh, idx) => {
     const dataPoints = years.map(y => rows.filter(r => r.year === y && r.shift === sh).length);
-    return { label: sh, data: dataPoints, borderColor: generateColors(1)[idx % generateColors(1).length], backgroundColor: 'transparent' };
+    return { label: sh, data: dataPoints, borderColor: colorForShifts[idx], backgroundColor: hexToRgba(colorForShifts[idx], 0.12), tension: 0.3, pointRadius: 4 };
   });
   const ctxShift = document.getElementById('chart-shift').getContext('2d');
-  charts.push(new Chart(ctxShift, { type: 'line', data: { labels: years, datasets: shiftDatasets }, options: { responsive: true, maintainAspectRatio: false } }));
+  charts.push(new Chart(ctxShift, { type: 'line', data: { labels: years, datasets: shiftDatasets }, options: buildCommonOptions() }));
 
-  // New: Incidents by Contractor
+  // New: Incidents by Contractor - horizontal bar for readability
   const contractorCounts = aggCount(rows, 'contractor_name');
   const contractorEntries = Object.entries(contractorCounts).sort((a,b)=>b[1]-a[1]);
   const contractorLabels = contractorEntries.map(e=>e[0]);
   const contractorData = contractorEntries.map(e=>e[1]);
   const ctxContractor = document.getElementById('chart-contractor').getContext('2d');
-  charts.push(new Chart(ctxContractor, { type: 'bar', data: { labels: contractorLabels, datasets:[{ label:'Incidents', data: contractorData, backgroundColor: '#6f42c1' }] }, options: { responsive: true, maintainAspectRatio: false } }));
+  charts.push(new Chart(ctxContractor, { type: 'bar', data: { labels: contractorLabels, datasets:[{ label:'Incidents', data: contractorData, backgroundColor: generateColors(contractorData.length) }] }, options: buildCommonOptions({ indexAxis: 'y', scales: { x: { beginAtZero: true } } }) }));
 
   // New: Priority Breakdown (pie)
   const priorityCounts = aggCount(rows, 'priority');
@@ -187,11 +221,20 @@ function renderCharts(rows) {
   const priorityLabels = priorityEntries.map(e=>e[0]);
   const priorityData = priorityEntries.map(e=>e[1]);
   const ctxPriority = document.getElementById('chart-priority').getContext('2d');
-  charts.push(new Chart(ctxPriority, { type: 'pie', data: { labels: priorityLabels, datasets:[{ data: priorityData, backgroundColor: generateColors(priorityData.length) }] }, options: { responsive: true, maintainAspectRatio: false } }));
+  charts.push(new Chart(ctxPriority, { type: 'pie', data: { labels: priorityLabels, datasets:[{ data: priorityData, backgroundColor: generateColors(priorityData.length) }] }, options: buildCommonOptions() }));
+}
+
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#','');
+  const bigint = parseInt(h, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 function generateColors(n) {
-  const palette = ['#3366CC','#DC3912','#FF9900','#109618','#990099','#0099C6','#DD4477','#66AA00','#B82E2E','#316395','#6f42c1','#20c997','#fd7e14'];
+  const palette = ['#3366CC','#DC3912','#FF9900','#109618','#990099','#0099C6','#DD4477','#66AA00','#B82E2E','#316395','#6f42c1','#20c997','#fd7e14','#e83e8c','#6c757d','#20a8d8','#8e44ad','#2ecc71','#e67e22','#d35400'];
   const out = [];
   for (let i=0;i<n;i++) out.push(palette[i % palette.length]);
   return out;

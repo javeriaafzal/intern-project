@@ -3,3 +3,15 @@ body { background: #f8f9fa; }
 .card { background: #fff; border: 1px solid #e6e6e6; }
 #summary { font-size: 0.95rem; }
 #data-table { font-size: 0.85rem; }
+
+/* Chart card sizing - allow charts to remain readable on small screens */
+.chart-card { display:flex; flex-direction:column; }
+.chart-card .card-title { margin-bottom: 0.5rem; }
+.chart-card canvas { width:100% !important; height:240px !important; }
+
+@media (max-width: 576px) {
+  .chart-card canvas { height:260px !important; }
+}
+
+/* Make table horizontally scrollable on small screens */
+.table-responsive { overflow-x:auto; }
