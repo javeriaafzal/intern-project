@@ -1,0 +1,5 @@
+/* styles.css */
+body { background: #f8f9fa; }
+.card { background: #fff; border: 1px solid #e6e6e6; }
+#summary { font-size: 0.95rem; }
+#data-table { font-size: 0.85rem; }
