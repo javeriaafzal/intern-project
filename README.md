@@ -1,14 +1,15 @@
-# Incident Tracker Dashboard
+# EHS Tracker Dashboards
 
-This is a simple static dashboard that lets you upload an Excel file (Incident Tracker) and view multiple charts to help managers understand site safety.
+This static, client-side dashboard turns EHS Excel workbooks into charts and searchable data previews. Each supported tracker has its own upload control and dashboard section.
 
 How it works
 
 - Open index.html in a browser (or host on GitHub Pages).
-- Click "Choose Excel file" and pick your Incident Tracker .xlsx file.
-- The site parses the first sheet and expects columns with these headers (case-insensitive):
-  SR, Site, Sources, Shift, Year, Date, Incident Category, Criticality, Type of Incident, Event Title, GEHSMS Standard, Detailed Observation, What is the Action?, Priority, Owner, Status, New Timeline, Department, Area, Contractor Name, Responsible
-- It then shows a table and multiple charts (Incidents by Site, by Year, by Incident Category, by Criticality, by Status).
+- Choose the upload card for the relevant tracker and select an `.xlsx` or `.xls` file.
+- The first worksheet is parsed in the browser; files are not sent to a server.
+- Upload any combination of Incident, BBS, MOC, GEHMS, EHS Observations, and PTW trackers.
+- Each workbook appears in a separate section with four tracker-specific charts and a collapsible table preview.
+- Header matching is case-insensitive and ignores repeated whitespace, periods, and underscores.
 
 Files added
 

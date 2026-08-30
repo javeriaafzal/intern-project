@@ -1,241 +1,210 @@
-// app.js
-// Parses the first sheet of an Excel file and renders charts using Chart.js
+// Client-side Excel tracker dashboard. Each supported tracker gets its own panel.
 
-const fileInput = document.getElementById('file-input');
-const dataTable = document.getElementById('data-table');
-const summaryDiv = document.getElementById('summary');
-
-let charts = [];
-
-fileInput.addEventListener('change', (ev) => {
-  const file = ev.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[firstSheetName];
-    const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    handleData(json);
-  };
-  reader.readAsArrayBuffer(file);
-});
-
-function normalizeKey(k) {
-  return String(k || '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function keyMap(row) {
-  // map headers to canonical keys (lowercase names matching expected columns)
-  const mapped = {};
-  for (const key in row) {
-    const nk = normalizeKey(key);
-    mapped[nk] = row[key];
+const TRACKERS = {
+  incident: {
+    title: 'Incident Tracker',
+    description: 'Incidents by site, year, category and status.',
+    columns: ['SR', 'Site', 'Sources', 'Shift', 'Year', 'Date', 'Incident Category', 'Criticality', 'Type of Incident', 'Event Title', 'GEHSMS Standard', 'Detailed Observation', 'What is the Action?', 'Priority', 'Owner', 'Status', 'New Timeline', 'Department', 'Area', 'Contractor Name', 'Responsible'],
+    charts: [['Site', 'bar'], ['Year', 'line'], ['Incident Category', 'doughnut'], ['Status', 'doughnut']]
+  },
+  bbs: {
+    title: 'BBS Tracker',
+    description: 'Behaviour-based safety observations and completion progress.',
+    columns: ['Completion Date', 'Site (Entity\\Location)', 'Similar Exposure Group', 'Observation Type', 'Created on', 'GPID field', 'Comment'],
+    charts: [['Site (Entity\\Location)', 'bar'], ['Observation Type', 'doughnut'], ['Similar Exposure Group', 'bar'], ['Completion Date', 'timeline']]
+  },
+  moc: {
+    title: 'MOC Tracker',
+    description: 'Management of change workload and completion status.',
+    columns: ['Title', 'MOC Number', 'Initiation Date', 'Initiator', 'Department', 'Status', 'Stage', 'Completion Date', 'Type of Change'],
+    charts: [['Status', 'doughnut'], ['Stage', 'bar'], ['Department', 'bar'], ['Type of Change', 'doughnut']]
+  },
+  gehms: {
+    title: 'GEHMS Tracker',
+    description: 'GEHSMS assessments, actions, priorities and timelines.',
+    columns: ['Action ID', 'Sources', 'Year', 'Date', 'Assessment', 'GEHSMS Standard', 'Detail of clause', 'What is the Action?', 'Priority', 'GPID', 'Name', 'Status', 'Current/Revised Timeline', 'Stage', 'Due/OverDue'],
+    charts: [['Status', 'doughnut'], ['Priority', 'bar'], ['GEHSMS Standard', 'bar'], ['Due/OverDue', 'doughnut']]
+  },
+  observations: {
+    title: 'EHS Observations Tracker',
+    description: 'Observation trends, responsibilities and corrective actions.',
+    columns: ['MM Date 1', 'MM Date 2', 'Shift', 'Observer name', 'Area', 'Permit Applicable', 'Observation Description', 'Relevant GEHSMS standard', 'Why it happened?', 'Action Taken(Corrective)', 'Action to be Taken(Preventive Action)', 'Department', 'Responsibility', 'Criticality', 'Status', 'Timelines', 'EHS Standard Name', 'Type'],
+    charts: [['Status', 'doughnut'], ['Criticality', 'bar'], ['Department', 'bar'], ['Type', 'doughnut']]
+  },
+  ptw: {
+    title: 'PTW Tracker',
+    description: 'Permit-to-work activity, categories and verification status.',
+    columns: ['Serial No', 'PTW no.', 'Permit Type', 'Date', 'Permit Details', 'MOC No.', 'Department', 'Area/Location', 'Shift', 'Start Time', 'End Time', 'Initiator', 'Authorizer', 'Executer', 'EHS verification', 'Working Group', 'Contractor company', 'Contact Number', 'No. of workers', 'LOTO required', 'Permit Extension', 'General work', 'Hot Work', 'Electrical Work', 'Work At height', 'Confined Space', 'Heavy Lifting', 'Demolition /Excavation', 'PTW status', 'Observation of PTW', 'Observation Category'],
+    charts: [['Permit Type', 'doughnut'], ['PTW status', 'bar'], ['Department', 'bar'], ['Observation Category', 'doughnut']]
   }
-  return mapped;
+};
+
+const chartInstances = new Map();
+
+function normalizeKey(value) {
+  return String(value || '').trim().toLowerCase().replace(/[._]/g, ' ').replace(/\s+/g, ' ');
 }
 
-function handleData(rows) {
-  if (!rows || rows.length === 0) {
-    summaryDiv.textContent = 'No rows found in the first sheet.';
-    return;
+function readValue(row, column) {
+  const wanted = normalizeKey(column);
+  const actualKey = Object.keys(row).find(key => normalizeKey(key) === wanted);
+  return actualKey === undefined ? '' : row[actualKey];
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function displayValue(value) {
+  if (typeof value === 'number' && value > 25000 && value < 100000 && window.XLSX?.SSF) {
+    return XLSX.SSF.format('yyyy-mm-dd', value);
   }
-
-  const mappedRows = rows.map(r => keyMap(r));
-
-  // create canonical column accessors
-  const data = mappedRows.map(r => ({
-    sr: r['sr'] || r['s r'] || r['#'] || '',
-    site: r['site'] || '',
-    sources: r['sources'] || '',
-    shift: r['shift'] || '',
-    year: r['year'] || (r['date'] ? parseYear(r['date']) : ''),
-    date: r['date'] || '',
-    incident_category: r['incident category'] || r['incident_category'] || r['category'] || '',
-    criticality: r['criticality'] || '',
-    type_of_incident: r['type of incident'] || r['type'] || '',
-    event_title: r['event title'] || '',
-    gehsms_standard: r['gehsms standard'] || '',
-    detailed_observation: r['detailed observation'] || '',
-    what_is_the_action: r['what is the action?'.toLowerCase()] || r['what is the action'] || '',
-    priority: r['priority'] || '',
-    owner: r['owner'] || '',
-    status: r['status'] || '',
-    new_timeline: r['new timeline'] || '',
-    department: r['department'] || '',
-    area: r['area'] || '',
-    contractor_name: r['contractor name'] || r['contractor'] || '',
-    responsible: r['responsible'] || ''
-  }));
-
-  renderSummary(data);
-  renderTable(data);
-  renderCharts(data);
+  return value ?? '';
 }
 
-function parseYear(dateVal) {
-  // try to parse a year from a date cell
-  if (!dateVal) return '';
-  try {
-    const d = new Date(dateVal);
-    if (!isNaN(d.getFullYear())) return String(d.getFullYear());
-  } catch (e) {}
-  // fallback: look for 4-digit year
-  const m = String(dateVal).match(/(20\d{2}|19\d{2})/);
-  return m ? m[0] : '';
+function countBy(rows, column) {
+  return rows.reduce((counts, row) => {
+    const value = String(displayValue(readValue(row, column))).trim() || 'Not specified';
+    counts[value] = (counts[value] || 0) + 1;
+    return counts;
+  }, {});
 }
 
-function aggCount(rows, key) {
-  const counts = {};
-  rows.forEach(r => {
-    const v = (r[key] || '').toString().trim() || 'Unknown';
-    counts[v] = (counts[v] || 0) + 1;
-  });
-  return counts;
+function monthLabel(value) {
+  if (typeof value === 'number' && window.XLSX?.SSF) value = XLSX.SSF.format('yyyy-mm-dd', value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Not specified' : date.toLocaleDateString('en', { year: 'numeric', month: 'short' });
 }
 
-function renderSummary(rows) {
-  const total = rows.length;
-  const open = rows.filter(r => (r.status || '').toLowerCase() !== 'closed').length;
-  summaryDiv.innerHTML = `<strong>Total incidents:</strong> ${total} &nbsp; | &nbsp; <strong>Open:</strong> ${open}`;
+function chartData(rows, column, chartType) {
+  let counts;
+  if (chartType === 'timeline') {
+    counts = rows.reduce((result, row) => {
+      const label = monthLabel(readValue(row, column));
+      result[label] = (result[label] || 0) + 1;
+      return result;
+    }, {});
+  } else {
+    counts = countBy(rows, column);
+  }
+  let entries = Object.entries(counts);
+  if (chartType === 'timeline') entries.sort((a, b) => new Date(a[0]) - new Date(b[0]));
+  else entries.sort((a, b) => b[1] - a[1]);
+  return { labels: entries.map(([label]) => label), values: entries.map(([, value]) => value) };
 }
 
-function renderTable(rows) {
-  const headers = ['SR','Site','Date','Year','Incident Category','Criticality','Type of Incident','Priority','Owner','Status','Department','Area','Contractor Name'];
-  const thead = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>`;
-  const tbody = rows.map(r => `<tr>${[
-    r.sr, r.site, r.date, r.year, r.incident_category, r.criticality, r.type_of_incident, r.priority, r.owner, r.status, r.department, r.area, r.contractor_name
-  ].map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('');
-  dataTable.innerHTML = thead + `<tbody>${tbody}</tbody>`;
-}
-
-function escapeHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function destroyCharts() {
-  charts.forEach(c => c.destroy());
-  charts = [];
-}
-
-// common chart options to improve UX: legend at bottom, tooltips that show counts + percentages
-function buildCommonOptions(extra = {}) {
+function chartOptions(horizontal = false) {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    indexAxis: horizontal ? 'y' : 'x',
     plugins: {
-      legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
-      tooltip: {
-        callbacks: {
-          label: function(ctx) {
-            // show value and percentage when possible
-            const val = ctx.parsed;
-            // compute dataset total
-            let total = 0;
-            if (Array.isArray(ctx.dataset.data)) {
-              total = ctx.dataset.data.reduce((s, d) => s + (typeof d === 'number' ? d : (d && d.y) || 0), 0);
-            }
-            const percent = total ? ((typeof val === 'number' ? val : (val && val.y) || 0) / total * 100).toFixed(1) : null;
-            if (percent !== null) return `${ctx.label || ''}: ${val} (${percent}%)`;
-            return `${ctx.label || ''}: ${val}`;
-          }
-        }
-      }
+      legend: { position: 'bottom', labels: { boxWidth: 12 } },
+      tooltip: { callbacks: { label: context => `${context.label}: ${context.raw}` } }
     },
-    scales: {
-      x: { ticks: { maxRotation: 45, minRotation: 0 }, grid: { display: false } },
-      y: { beginAtZero: true }
-    },
-    ...extra
+    scales: horizontal
+      ? { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } }
+      : undefined
   };
 }
 
-function renderCharts(rows) {
-  destroyCharts();
-
-  // Site chart - horizontal bar for readability when many sites
-  const siteCounts = aggCount(rows, 'site');
-  const siteEntries = Object.entries(siteCounts).sort((a,b)=>b[1]-a[1]);
-  const siteLabels = siteEntries.map(e=>e[0]);
-  const siteData = siteEntries.map(e=>e[1]);
-  const ctxSite = document.getElementById('chart-site').getContext('2d');
-  charts.push(new Chart(ctxSite, {
-    type: 'bar',
-    data: { labels: siteLabels, datasets: [{ label: 'Incidents', data: siteData, backgroundColor: generateColors(siteData.length) }] },
-    options: buildCommonOptions({ indexAxis: 'y', scales: { x: { beginAtZero: true }, y: { ticks: { autoSkip: false } } } })
-  }));
-
-  // Year chart (line)
-  const yearCounts = aggCount(rows, 'year');
-  const yearEntries = Object.entries(yearCounts).filter(e=>e[0] && e[0] !== 'Unknown').sort((a,b)=>a[0]-b[0]);
-  const yearLabels = yearEntries.map(e=>e[0]);
-  const yearData = yearEntries.map(e=>e[1]);
-  const ctxYear = document.getElementById('chart-year').getContext('2d');
-  charts.push(new Chart(ctxYear, { type: 'line', data: { labels: yearLabels, datasets:[{ label: 'Incidents', data: yearData, borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.12)', fill: true, tension: 0.3 }] }, options: buildCommonOptions({ scales: { x: { grid: { display: false } }, y: { beginAtZero:true } } }) }));
-
-  // Category (pie)
-  const catCounts = aggCount(rows, 'incident_category');
-  const catEntries = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]);
-  const catLabels = catEntries.map(e=>e[0]);
-  const catData = catEntries.map(e=>e[1]);
-  const ctxCat = document.getElementById('chart-category').getContext('2d');
-  charts.push(new Chart(ctxCat, { type: 'pie', data: { labels: catLabels, datasets:[{ data: catData, backgroundColor: generateColors(catData.length) }] }, options: buildCommonOptions() }));
-
-  // Criticality
-  const critCounts = aggCount(rows, 'criticality');
-  const critEntries = Object.entries(critCounts).sort((a,b)=>b[1]-a[1]);
-  const critLabels = critEntries.map(e=>e[0]);
-  const critData = critEntries.map(e=>e[1]);
-  const ctxCrit = document.getElementById('chart-criticality').getContext('2d');
-  charts.push(new Chart(ctxCrit, { type: 'bar', data: { labels: critLabels, datasets:[{ label:'Incidents', data: critData, backgroundColor: generateColors(critData.length) }] }, options: buildCommonOptions() }));
-
-  // Status
-  const statusCounts = aggCount(rows, 'status');
-  const statusEntries = Object.entries(statusCounts).sort((a,b)=>b[1]-a[1]);
-  const statusLabels = statusEntries.map(e=>e[0]);
-  const statusData = statusEntries.map(e=>e[1]);
-  const ctxStatus = document.getElementById('chart-status').getContext('2d');
-  charts.push(new Chart(ctxStatus, { type: 'doughnut', data: { labels: statusLabels, datasets:[{ data: statusData, backgroundColor: generateColors(statusData.length) }] }, options: buildCommonOptions() }));
-
-  // New: Trend by Shift (per Year)
-  const years = Array.from(new Set(rows.map(r=>r.year).filter(y=>y && y !== 'Unknown'))).sort();
-  const shifts = Array.from(new Set(rows.map(r=>r.shift).filter(s=>s && s !== 'Unknown'))).sort();
-  const colorForShifts = generateColors(shifts.length);
-  const shiftDatasets = shifts.map((sh, idx) => {
-    const dataPoints = years.map(y => rows.filter(r => r.year === y && r.shift === sh).length);
-    return { label: sh, data: dataPoints, borderColor: colorForShifts[idx], backgroundColor: hexToRgba(colorForShifts[idx], 0.12), tension: 0.3, pointRadius: 4 };
+function renderCharts(type, rows) {
+  const config = TRACKERS[type];
+  (chartInstances.get(type) || []).forEach(chart => chart.destroy());
+  const instances = config.charts.map(([column, requestedType], index) => {
+    const { labels, values } = chartData(rows, column, requestedType);
+    const canvas = document.getElementById(`${type}-chart-${index}`);
+    const horizontal = requestedType === 'bar';
+    const actualType = requestedType === 'timeline' ? 'line' : requestedType;
+    return new Chart(canvas, {
+      type: actualType,
+      data: {
+        labels,
+        datasets: [{
+          label: column,
+          data: values,
+          backgroundColor: actualType === 'line' ? 'rgba(14, 116, 144, .16)' : colors(values.length),
+          borderColor: actualType === 'line' ? '#0e7490' : '#ffffff',
+          borderWidth: actualType === 'line' ? 2 : 1,
+          fill: actualType === 'line',
+          tension: .25
+        }]
+      },
+      options: chartOptions(horizontal)
+    });
   });
-  const ctxShift = document.getElementById('chart-shift').getContext('2d');
-  charts.push(new Chart(ctxShift, { type: 'line', data: { labels: years, datasets: shiftDatasets }, options: buildCommonOptions() }));
-
-  // New: Incidents by Contractor - horizontal bar for readability
-  const contractorCounts = aggCount(rows, 'contractor_name');
-  const contractorEntries = Object.entries(contractorCounts).sort((a,b)=>b[1]-a[1]);
-  const contractorLabels = contractorEntries.map(e=>e[0]);
-  const contractorData = contractorEntries.map(e=>e[1]);
-  const ctxContractor = document.getElementById('chart-contractor').getContext('2d');
-  charts.push(new Chart(ctxContractor, { type: 'bar', data: { labels: contractorLabels, datasets:[{ label:'Incidents', data: contractorData, backgroundColor: generateColors(contractorData.length) }] }, options: buildCommonOptions({ indexAxis: 'y', scales: { x: { beginAtZero: true } } }) }));
-
-  // New: Priority Breakdown (pie)
-  const priorityCounts = aggCount(rows, 'priority');
-  const priorityEntries = Object.entries(priorityCounts).sort((a,b)=>b[1]-a[1]);
-  const priorityLabels = priorityEntries.map(e=>e[0]);
-  const priorityData = priorityEntries.map(e=>e[1]);
-  const ctxPriority = document.getElementById('chart-priority').getContext('2d');
-  charts.push(new Chart(ctxPriority, { type: 'pie', data: { labels: priorityLabels, datasets:[{ data: priorityData, backgroundColor: generateColors(priorityData.length) }] }, options: buildCommonOptions() }));
+  chartInstances.set(type, instances);
 }
 
-function hexToRgba(hex, alpha) {
-  const h = hex.replace('#','');
-  const bigint = parseInt(h, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `rgba(${r},${g},${b},${alpha})`;
+function colors(size) {
+  const palette = ['#0e7490', '#f59e0b', '#16a34a', '#7c3aed', '#dc2626', '#0284c7', '#db2777', '#65a30d', '#ea580c', '#4f46e5'];
+  return Array.from({ length: size }, (_, index) => palette[index % palette.length]);
 }
 
-function generateColors(n) {
-  const palette = ['#3366CC','#DC3912','#FF9900','#109618','#990099','#0099C6','#DD4477','#66AA00','#B82E2E','#316395','#6f42c1','#20c997','#fd7e14','#e83e8c','#6c757d','#20a8d8','#8e44ad','#2ecc71','#e67e22','#d35400'];
-  const out = [];
-  for (let i=0;i<n;i++) out.push(palette[i % palette.length]);
-  return out;
+function renderTable(type, rows) {
+  const columns = TRACKERS[type].columns;
+  const table = document.getElementById(`${type}-table`);
+  const preview = rows.slice(0, 100);
+  table.innerHTML = `<thead><tr>${columns.map(column => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead><tbody>${preview.map(row => `<tr>${columns.map(column => `<td>${escapeHtml(displayValue(readValue(row, column)))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  document.getElementById(`${type}-preview-note`).textContent = rows.length > 100 ? `Showing the first 100 of ${rows.length} rows.` : `Showing all ${rows.length} rows.`;
 }
+
+function renderTracker(type, rows, fileName) {
+  const section = document.getElementById(`${type}-section`);
+  section.hidden = false;
+  document.getElementById(`${type}-file-name`).textContent = fileName;
+  document.getElementById(`${type}-total`).textContent = rows.length;
+  renderTable(type, rows);
+  renderCharts(type, rows);
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showUploadState(type, message, isError = false) {
+  const status = document.getElementById(`${type}-upload-status`);
+  status.textContent = message;
+  status.classList.toggle('text-danger', isError);
+}
+
+function loadWorkbook(type, file) {
+  showUploadState(type, `Reading ${file.name}…`);
+  const reader = new FileReader();
+  reader.onload = event => {
+    try {
+      const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array', cellDates: true });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+      if (!rows.length) throw new Error('No data rows were found in the first worksheet.');
+      renderTracker(type, rows, file.name);
+      showUploadState(type, `${rows.length} rows loaded`);
+    } catch (error) {
+      showUploadState(type, error.message || 'This workbook could not be read.', true);
+    }
+  };
+  reader.onerror = () => showUploadState(type, 'This file could not be read.', true);
+  reader.readAsArrayBuffer(file);
+}
+
+function trackerMarkup(type, config) {
+  return `<section id="${type}-section" class="tracker-section" hidden>
+    <div class="section-heading">
+      <div><p class="eyebrow">Tracker dashboard</p><h2>${escapeHtml(config.title)}</h2><p>${escapeHtml(config.description)}</p></div>
+      <div class="total-pill"><strong id="${type}-total">0</strong><span>records</span></div>
+    </div>
+    <p class="source-file">Source: <strong id="${type}-file-name"></strong></p>
+    <div class="charts-grid">${config.charts.map(([column], index) => `<article class="chart-card"><h3>${escapeHtml(column)}</h3><div class="canvas-wrap"><canvas id="${type}-chart-${index}"></canvas></div></article>`).join('')}</div>
+    <details class="data-preview"><summary>View uploaded data</summary><p id="${type}-preview-note" class="preview-note"></p><div class="table-wrap"><table id="${type}-table"></table></div></details>
+  </section>`;
+}
+
+function initialize() {
+  const uploadGrid = document.getElementById('upload-grid');
+  const dashboards = document.getElementById('dashboards');
+  uploadGrid.innerHTML = Object.entries(TRACKERS).map(([type, config]) => `<label class="upload-card" for="${type}-input"><span class="upload-icon">↗</span><strong>${escapeHtml(config.title)}</strong><span>${config.columns.length} recognized columns</span><input id="${type}-input" type="file" accept=".xlsx,.xls" data-tracker="${type}"><small id="${type}-upload-status">Choose an Excel file</small></label>`).join('');
+  dashboards.innerHTML = Object.entries(TRACKERS).map(([type, config]) => trackerMarkup(type, config)).join('');
+  uploadGrid.addEventListener('change', event => {
+    const input = event.target.closest('input[type="file"]');
+    if (input?.files[0]) loadWorkbook(input.dataset.tracker, input.files[0]);
+  });
+}
+
+initialize();
