@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive injury data dashboard for EHS tracker files">
+  <title>Injury Data · EHS Insight</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="injury-page">
+  <header class="page-header">
+    <nav><a class="brand" href="index.html">EHS<span>insight</span></a><a class="back-link" href="index.html">← All dashboards</a></nav>
+    <div class="page-heading"><div><p class="eyebrow">Injury intelligence</p><h1>See where safety needs attention.</h1><p>Explore injury location, severity and cause in one focused view.</p></div><label class="header-upload" for="injury-input"><span>Upload injury data</span><small id="injury-upload-status">Excel .xlsx or .xls</small><input id="injury-input" type="file" accept=".xlsx,.xls"></label></div>
+  </header>
+
+  <main class="injury-main">
+    <section id="injury-empty" class="empty-state"><div class="empty-icon">+</div><h2>Build your injury overview</h2><p>Select an Injury Data workbook to map every record to the body diagram and dashboard.</p><label class="primary-button" for="injury-input">Choose Excel file</label><p class="privacy-copy">Processed securely in your browser — your file never leaves this device.</p></section>
+
+    <div id="injury-dashboard" hidden>
+      <section class="injury-summary">
+        <div class="summary-copy"><p class="eyebrow">Injury overview</p><h2 id="injury-dashboard-title">Workforce injury snapshot</h2><p>Source: <strong id="injury-file-name"></strong></p></div>
+        <div class="metric"><strong id="injury-total">0</strong><span>Total injuries</span></div>
+        <div class="metric"><strong id="injury-days">—</strong><span>Days since last event</span></div>
+        <div class="metric critical"><strong id="injury-severe">0</strong><span>High severity</span></div>
+      </section>
+
+      <section class="body-panel">
+        <div class="body-copy"><p class="eyebrow">Body map</p><h2>Where injuries occur</h2><p>Counts are matched from <strong>Body Part</strong>, <strong>Body Position</strong>, and <strong>Injury Location</strong>. Select a region to highlight it.</p><div id="body-legend" class="body-legend"></div></div>
+        <div class="body-stage">
+          <svg class="body-svg" viewBox="0 0 300 570" role="img" aria-labelledby="body-title body-description">
+            <title id="body-title">Human body injury map</title><desc id="body-description">Front-facing human silhouette with selectable injury regions.</desc>
+            <g class="silhouette">
+              <circle cx="150" cy="54" r="36" data-region="head"/>
+              <path d="M127 91 Q105 99 95 123 L70 226 Q66 242 78 248 Q89 251 94 234 L114 172 L112 282 Q112 310 120 334 L104 510 Q102 537 118 543 Q131 545 136 521 L150 360 L164 521 Q169 545 182 543 Q198 537 196 510 L180 334 Q188 310 188 282 L186 172 L206 234 Q211 251 222 248 Q234 242 230 226 L205 123 Q195 99 173 91 Z"/>
+            </g>
+            <g class="hit-regions">
+              <circle data-region="head" cx="150" cy="54" r="38"/>
+              <path data-region="shoulder" d="M110 97 Q150 78 190 97 L207 130 L185 145 L173 112 L127 112 L115 145 L93 130Z"/>
+              <path data-region="torso" d="M121 112 L179 112 L187 270 Q150 290 113 270Z"/>
+              <path data-region="arm" d="M111 118 L91 126 L67 228 Q65 248 81 252 L99 228 L121 145Z M189 118 L209 126 L233 228 Q235 248 219 252 L201 228 L179 145Z"/>
+              <path data-region="hand" d="M65 226 Q55 249 72 272 Q83 282 94 261 L84 231Z M235 226 Q245 249 228 272 Q217 282 206 261 L216 231Z"/>
+              <path data-region="leg" d="M113 267 L150 277 L143 430 L132 517 L103 511 L116 332Z M187 267 L150 277 L157 430 L168 517 L197 511 L184 332Z"/>
+              <path data-region="foot" d="M103 505 Q94 530 105 548 Q123 557 133 542 L134 511Z M197 505 Q206 530 195 548 Q177 557 167 542 L166 511Z"/>
+            </g>
+          </svg>
+          <div id="body-callouts" class="body-callouts"></div>
+        </div>
+      </section>
+
+      <section class="injury-charts"><article class="chart-card"><h3>Injury type</h3><div class="canvas-wrap"><canvas id="injury-type-chart"></canvas></div></article><article class="chart-card"><h3>Actual severity</h3><div class="canvas-wrap"><canvas id="injury-severity-chart"></canvas></div></article><article class="chart-card"><h3>Primary cause</h3><div class="canvas-wrap"><canvas id="injury-cause-chart"></canvas></div></article></section>
+      <section class="records-panel"><div><p class="eyebrow">Event register</p><h2>Injury records</h2><p id="injury-preview-note"></p></div><div class="table-wrap"><table id="injury-table"></table></div></section>
+    </div>
+  </main>
+  <footer><strong>EHSinsight</strong><span>Powered by SheetJS &amp; Chart.js · Client-side only</span></footer>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script><script src="injury.js"></script>
+</body>
+</html>

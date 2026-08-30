@@ -8,6 +8,7 @@ How it works
 - Choose the upload card for the relevant tracker and select an `.xlsx` or `.xls` file.
 - The first worksheet is parsed in the browser; files are not sent to a server.
 - Upload any combination of Incident, BBS, MOC, GEHMS, EHS Observations, and PTW trackers.
+- Open the dedicated Injury Data screen to visualize injury locations on an interactive body map, review severity and cause charts, and inspect all supported injury fields.
 - Each workbook appears in a separate section with four tracker-specific charts and a collapsible table preview.
 - Header matching is case-insensitive and ignores repeated whitespace, periods, and underscores.
 
@@ -15,6 +16,7 @@ Files added
 
 - index.html — the dashboard UI
 - app.js — parsing, aggregation, chart rendering logic
+- injury.html / injury.js — dedicated Injury Data dashboard and interactive body map
 - styles.css — small styles
 - README.md — usage and deployment notes
 
